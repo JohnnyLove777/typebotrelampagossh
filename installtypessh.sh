@@ -66,6 +66,9 @@ function instalar_typebot {
     # Adiciona usuário ao grupo Docker
     sudo usermod -aG docker ${USER}
 
+    # Solicita informações ao usuário
+    solicitar_informacoes
+
     # Criação do arquivo typebot_config.sh com base nas informações fornecidas
 cat <<EOF > typebot_config.sh
 server {
@@ -122,24 +125,6 @@ server {
     }
 }
 EOF
-
-# Solicita informações ao usuário
-solicitar_informacoes
-
-    # Substitui os espaços reservados no script pelos valores inseridos pelo usuário
-sed -i "s/\[dominio\]/$DOMINIO_INPUT/g" typebot_config.sh
-sed -i "s/\[dominio\]/$DOMINIO_INPUT/g" viewbot_config.sh
-sed -i "s/\[dominio\]/$DOMINIO_INPUT/g" minio_config.sh
-
-# Substitui os espaços reservados no script pelos valores inseridos pelo usuário
-sed -i "s/\[gmail\]/$EMAIL_GMAIL_INPUT/g" typebot_config.sh
-sed -i "s/\[gmail\]/$EMAIL_GMAIL_INPUT/g" viewbot_config.sh
-sed -i "s/\[gmail\]/$EMAIL_GMAIL_INPUT/g" minio_config.sh
-
-# Substitui os espaços reservados no script pelos valores inseridos pelo usuário
-sed -i "s/\[senha_app_gmail\]/$SENHA_APP_GMAIL_INPUT/g" typebot_config.sh
-sed -i "s/\[senha_app_gmail\]/$SENHA_APP_GMAIL_INPUT/g" viewbot_config.sh
-sed -i "s/\[senha_app_gmail\]/$SENHA_APP_GMAIL_INPUT/g" minio_config.sh
 
 # Copia os arquivos de configuração para o diretório do nginx
 cd && sudo cp typebot_config.sh /etc/nginx/sites-available/typebot
