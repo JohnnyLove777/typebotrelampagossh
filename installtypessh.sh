@@ -127,9 +127,9 @@ server {
 EOF
 
 # Copia os arquivos de configuração para o diretório do nginx
-cd && sudo cp typebot_config.sh /etc/nginx/sites-available/typebot
-cd && sudo cp viewbot_config.sh /etc/nginx/sites-available/viewbot
-cd && sudo cp minio_config.sh /etc/nginx/sites-available/minio
+sudo cp typebot_config.sh /etc/nginx/sites-available/typebot
+sudo cp viewbot_config.sh /etc/nginx/sites-available/viewbot
+sudo cp minio_config.sh /etc/nginx/sites-available/minio
 
 # Cria links simbólicos para ativar os sites no nginx
 sudo ln -s /etc/nginx/sites-available/typebot /etc/nginx/sites-enabled
@@ -161,8 +161,8 @@ services:
       - typebot-db
     environment: 
       - DATABASE_URL=postgresql://postgres:typebot@typebot-db:5432/typebot
-      - NEXTAUTH_URL=https://typebot.$DOMINIO_INPUT:3001
-      - NEXT_PUBLIC_VIEWER_URL=https://bot.$DOMINIO_INPUT:3002
+      - NEXTAUTH_URL=https://typebot.$DOMINIO_INPUT
+      - NEXT_PUBLIC_VIEWER_URL=https://bot.$DOMINIO_INPUT
       - ENCRYPTION_SECRET=875c916244442f7d89a8f376d9d33cac
       - ADMIN_EMAIL=${EMAIL_GMAIL_INPUT}
       - SMTP_HOST=smtp.gmail.com
@@ -183,8 +183,8 @@ services:
     restart: always
     environment:
       - DATABASE_URL=postgresql://postgres:typebot@typebot-db:5432/typebot
-      - NEXT_PUBLIC_VIEWER_URL=https://bot.$DOMINIO_INPUT:3002
-      - NEXTAUTH_URL=https://typebot.$DOMINIO_INPUT:3001
+      - NEXT_PUBLIC_VIEWER_URL=https://bot.$DOMINIO_INPUT
+      - NEXTAUTH_URL=https://typebot.$DOMINIO_INPUT
       - ENCRYPTION_SECRET=875c916244442f7d89a8f376d9d33cac
       - S3_ACCESS_KEY=minio
       - S3_SECRET_KEY=minio123
@@ -205,7 +205,6 @@ services:
       MINIO_ROOT_PASSWORD: minio123
     volumes:
       - s3_data:/data
-
   createbuckets:
     image: minio/mc
     depends_on:
@@ -218,7 +217,6 @@ services:
       /usr/bin/mc anonymous set public minio/typebot/public;
       exit 0;
       "
-
 volumes:
   db_data:
   s3_data:
