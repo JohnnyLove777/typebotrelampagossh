@@ -3,27 +3,16 @@
 # Função para solicitar informações ao usuário e armazená-las em variáveis
 function solicitar_informacoes {
 
-    # Loop para solicitar e verificar o subdomínio do viewer
+    # Loop para solicitar e verificar o dominio
     while true; do
-    read -p "Digite o subdomínio para o viewer (por exemplo, viewer.johnny.com.br): " SUBDOMINIO_VIEWER
+    read -p "Digite o domínio (por exemplo, johnny.com.br): " DOMINIO
     # Verifica se o subdomínio tem um formato válido
-    if [[ $SUBDOMINIO_VIEWER =~ ^[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+    if [[ $DOMINIO =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
         break
     else
-        echo "Por favor, insira um subdomínio válido no formato 'bot.johnny.com.br'."
+        echo "Por favor, insira um domínio válido no formato, por exemplo 'johnny.com.br'."
     fi
-    done
-
-    # Loop para solicitar e verificar o subdomínio do builder
-    while true; do
-    read -p "Digite o subdomínio para o builder (por exemplo, builder.johnny.com.br): " SUBDOMINIO_BUILDER
-    # Verifica se o subdomínio tem um formato válido
-    if [[ $SUBDOMINIO_BUILDER =~ ^[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
-        break
-    else
-        echo "Por favor, insira um subdomínio válido no formato 'bot.johnny.com.br'."
-    fi
-    done
+    done    
 
     # Loop para solicitar e verificar o e-mail do Gmail
     while true; do
@@ -51,8 +40,7 @@ function solicitar_informacoes {
     # Armazena as informações inseridas pelo usuário nas variáveis globais
     EMAIL_GMAIL_INPUT=$EMAIL_GMAIL
     SENHA_APP_GMAIL_INPUT=$SENHA_APP_GMAIL
-    SUBDOMINIO_VIEWER_INPUT=$SUBDOMINIO_VIEWER
-    SUBDOMINIO_BUILDER_INPUT=$SUBDOMINIO_BUILDER
+    DOMINIO_INPUT=$DOMINIO
 }
 
 # Função para instalar o Typebot de acordo com os comandos fornecidos
@@ -77,25 +65,8 @@ function instalar_typebot {
 
     # Criação do arquivo docker-compose.yml com base nas informações fornecidas
     cat <<EOF > docker-compose.yml
-# Johnny Typebot Installer Without Domain
-# Version 1.0
-
 version: '3.3'
 services:
-  caddy-gen:
-    container_name: caddy-gen
-    image: 'wemakeservices/caddy-gen:latest'
-    restart: always
-    volumes:
-      - /var/run/docker.sock:/tmp/docker.sock:ro
-      - {$PWD}/.typebot/caddy-certificates:/data/caddy
-    ports:
-      - '80:80'
-      - '443:443'
-    depends_on:
-      - typebot-builder
-      - typebot-viewer
-
   typebot-db:
     image: postgres:13
     restart: always
@@ -114,8 +85,8 @@ services:
       - typebot-db
     environment: 
       - DATABASE_URL=postgresql://postgres:typebot@typebot-db:5432/typebot
-      - NEXTAUTH_URL=https://${SUBDOMINIO_BUILDER_INPUT}:3001
-      - NEXT_PUBLIC_VIEWER_URL=https://${SUBDOMINIO_VIEWER_INPUT}:3002
+      - NEXTAUTH_URL=https://typebot.$DOMINIO_INPUT:3001
+      - NEXT_PUBLIC_VIEWER_URL=https://bot.$DOMINIO_INPUT:3002
       - ENCRYPTION_SECRET=875c916244442f7d89a8f376d9d33cac
       - ADMIN_EMAIL=${EMAIL_GMAIL_INPUT}
       - SMTP_HOST=smtp.gmail.com
@@ -127,7 +98,7 @@ services:
       - S3_ACCESS_KEY=minio
       - S3_SECRET_KEY=minio123
       - S3_BUCKET=typebot
-      - S3_ENDPOINT=https://${SUBDOMINIO_BUILDER_INPUT}:9000
+      - S3_ENDPOINT=https://storage.$DOMINIO_INPUT
 
   typebot-viewer:
     ports:
@@ -136,13 +107,13 @@ services:
     restart: always
     environment:
       - DATABASE_URL=postgresql://postgres:typebot@typebot-db:5432/typebot
-      - NEXT_PUBLIC_VIEWER_URL=https://${SUBDOMINIO_VIEWER_INPUT}:3002
-      - NEXTAUTH_URL=https://${SUBDOMINIO_BUILDER_INPUT}:3001
+      - NEXT_PUBLIC_VIEWER_URL=https://bot.$DOMINIO_INPUT:3002
+      - NEXTAUTH_URL=https://typebot.$DOMINIO_INPUT:3001
       - ENCRYPTION_SECRET=875c916244442f7d89a8f376d9d33cac
       - S3_ACCESS_KEY=minio
       - S3_SECRET_KEY=minio123
       - S3_BUCKET=typebot
-      - S3_ENDPOINT=https://${SUBDOMINIO_BUILDER_INPUT}:9000
+      - S3_ENDPOINT=https://storage.$DOMINIO_INPUT
 
   mail:
     image: bytemark/smtp
