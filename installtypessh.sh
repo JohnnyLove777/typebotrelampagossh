@@ -56,12 +56,103 @@ function instalar_typebot {
     sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable"
     sudo apt update
     sudo apt install -y docker-ce docker-compose
+    sudo apt update
+    sudo apt install nginx
+    sudo apt update
+    sudo apt install certbot
+    sudo apt install python3-certbot-nginx
+    sudo apt update
 
     # Adiciona usuário ao grupo Docker
     sudo usermod -aG docker ${USER}
 
-    # Solicita informações ao usuário
-    solicitar_informacoes    
+    # Criação do arquivo typebot_config.sh com base nas informações fornecidas
+cat <<EOF > typebot_config.sh
+server {
+    server_name typebot.$DOMINIO_INPUT;
+
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+
+# Criação do arquivo viewbot_config.sh com base nas informações fornecidas
+cat <<EOF > viewbot_config.sh
+server {
+    server_name bot.$DOMINIO_INPUT;
+
+    location / {
+        proxy_pass http://127.0.0.1:3002;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+
+# Criação do arquivo minio_config.sh com base nas informações fornecidas
+cat <<EOF > minio_config.sh
+server {
+    server_name storage.$DOMINIO_INPUT;
+
+    location / {
+        proxy_pass http://127.0.0.1:9000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+
+# Solicita informações ao usuário
+solicitar_informacoes
+
+    # Substitui os espaços reservados no script pelos valores inseridos pelo usuário
+sed -i "s/\[dominio\]/$DOMINIO_INPUT/g" typebot_config.sh
+sed -i "s/\[dominio\]/$DOMINIO_INPUT/g" viewbot_config.sh
+sed -i "s/\[dominio\]/$DOMINIO_INPUT/g" minio_config.sh
+
+# Substitui os espaços reservados no script pelos valores inseridos pelo usuário
+sed -i "s/\[gmail\]/$EMAIL_GMAIL_INPUT/g" typebot_config.sh
+sed -i "s/\[gmail\]/$EMAIL_GMAIL_INPUT/g" viewbot_config.sh
+sed -i "s/\[gmail\]/$EMAIL_GMAIL_INPUT/g" minio_config.sh
+
+# Substitui os espaços reservados no script pelos valores inseridos pelo usuário
+sed -i "s/\[senha_app_gmail\]/$SENHA_APP_GMAIL_INPUT/g" typebot_config.sh
+sed -i "s/\[senha_app_gmail\]/$SENHA_APP_GMAIL_INPUT/g" viewbot_config.sh
+sed -i "s/\[senha_app_gmail\]/$SENHA_APP_GMAIL_INPUT/g" minio_config.sh
+
+# Copia os arquivos de configuração para o diretório do nginx
+cd && sudo cp typebot_config.sh /etc/nginx/sites-available/typebot
+cd && sudo cp viewbot_config.sh /etc/nginx/sites-available/viewbot
+cd && sudo cp minio_config.sh /etc/nginx/sites-available/minio
+
+# Cria links simbólicos para ativar os sites no nginx
+sudo ln -s /etc/nginx/sites-available/typebot /etc/nginx/sites-enabled
+sudo ln -s /etc/nginx/sites-available/viewbot /etc/nginx/sites-enabled
+sudo ln -s /etc/nginx/sites-available/minio /etc/nginx/sites-enabled
+
+# Solicita e instala certificados SSL usando Certbot
+sudo certbot --nginx --email $EMAIL_GMAIL_INPUT --redirect --agree-tos -d typebot.$DOMINIO_INPUT -d bot.$DOMINIO_INPUT -d storage.$DOMINIO_INPUT
 
     # Criação do arquivo docker-compose.yml com base nas informações fornecidas
     cat <<EOF > docker-compose.yml
