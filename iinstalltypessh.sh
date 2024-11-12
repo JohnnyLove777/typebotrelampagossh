@@ -72,9 +72,6 @@ EOF
     cat <<EOF > docker-compose.yml
 version: '3.3'
 
-volumes:
-  db-data:
-
 services:
   typebot-db:
     image: postgres:16
@@ -85,10 +82,10 @@ services:
       - POSTGRES_DB=typebot
       - POSTGRES_PASSWORD=typebot
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+        test: ["CMD-SHELL", "pg_isready -U postgres"]
+        interval: 5s
+        timeout: 5s
+        retries: 5
 
   typebot-builder:
     image: baptistearno/typebot-builder:latest
@@ -125,7 +122,7 @@ services:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: minio123
     volumes:
-      - s3_data:/data
+      - s3-data:/data
 
   createbuckets:
     image: minio/mc
@@ -139,9 +136,11 @@ services:
       /usr/bin/mc anonymous set public minio/typebot/public;
       exit 0;
       "
+
 volumes:
   db-data:
-  s3_data:
+  s3-data:
+
 EOF
 
     # Configuração do Nginx
