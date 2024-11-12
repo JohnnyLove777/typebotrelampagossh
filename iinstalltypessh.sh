@@ -2,17 +2,22 @@
 
 # Função para solicitar informações ao usuário e armazená-las em variáveis
 function solicitar_informacoes {
+
+    # Loop para solicitar e verificar o dominio
     while true; do
-        read -p "Digite o domínio (por exemplo, johnny.com.br): " DOMINIO
-        if [[ $DOMINIO =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
-            break
-        else
-            echo "Por favor, insira um domínio válido no formato, por exemplo 'johnny.com.br'."
-        fi
+    read -p "Digite o domínio (por exemplo, johnny.com.br): " DOMINIO
+    # Verifica se o subdomínio tem um formato válido
+    if [[ $DOMINIO =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+        break
+    else
+        echo "Por favor, insira um domínio válido no formato, por exemplo 'johnny.com.br'."
+    fi
     done    
 
+    # Loop para solicitar e verificar o e-mail do Gmail
     while true; do
         read -p "Digite o e-mail do Gmail para cadastro do Typebot (sem espaços): " EMAIL_GMAIL
+        # Verifica se o e-mail tem o formato correto e não contém espaços
         if [[ $EMAIL_GMAIL =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
             break
         else
@@ -20,9 +25,11 @@ function solicitar_informacoes {
         fi
     done
 
+    # Loop para solicitar e verificar a senha de app do Gmail
     while true; do
         read -p "Digite a senha de app do Gmail (sem espaços, exatamente 16 caracteres): " SENHA_APP_GMAIL
         echo
+        # Verifica se a senha não contém espaços e tem exatamente 16 caracteres
         if [[ ! $SENHA_APP_GMAIL =~ [[:space:]] && ${#SENHA_APP_GMAIL} -eq 16 ]]; then
             break
         else
@@ -30,48 +37,111 @@ function solicitar_informacoes {
         fi
     done
 
+    # Armazena as informações inseridas pelo usuário nas variáveis globais
     EMAIL_GMAIL_INPUT=$EMAIL_GMAIL
     SENHA_APP_GMAIL_INPUT=$SENHA_APP_GMAIL
     DOMINIO_INPUT=$DOMINIO
 }
 
-# Função para instalar o Typebot com bibliotecas atualizadas
+# Função para instalar o Typebot de acordo com os comandos fornecidos
 function instalar_typebot {
-    sudo apt update
+    # Atualização e upgrade do sistema
+    #sudo apt update
     sudo apt upgrade -y
-    sudo apt install -y software-properties-common curl apt-transport-https ca-certificates nginx certbot python3-certbot-nginx
+    sudo apt-add-repository universe
+
+    # Instalação das dependências
+    sudo apt install -y python2-minimal nodejs npm git curl apt-transport-https ca-certificates software-properties-common
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-    sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+    sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable"
     sudo apt update
     sudo apt install -y docker-ce docker-compose
+    sudo apt update
+    sudo apt install nginx
+    sudo apt update
+    sudo apt install certbot
+    sudo apt install python3-certbot-nginx
+    sudo apt update
 
+    # Adiciona usuário ao grupo Docker
     sudo usermod -aG docker ${USER}
 
+    # Solicita informações ao usuário
     solicitar_informacoes
 
-    # Criação do arquivo .env
-cat <<EOF > .env
-ENCRYPTION_SECRET=$(openssl rand -base64 32)
-DATABASE_URL=postgresql://postgres:typebot@typebot-db:5432/typebot
-NEXTAUTH_URL=https://typebot.$DOMINIO_INPUT
-NEXT_PUBLIC_VIEWER_URL=https://bot.$DOMINIO_INPUT
-ADMIN_EMAIL=$EMAIL_GMAIL_INPUT
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=465
-SMTP_USERNAME=$EMAIL_GMAIL_INPUT
-SMTP_PASSWORD=$SENHA_APP_GMAIL_INPUT
-SMTP_SECURE=true
-NEXT_PUBLIC_SMTP_FROM="Suporte Typebot <$EMAIL_GMAIL_INPUT>"
-S3_ACCESS_KEY=minio
-S3_SECRET_KEY=minio123
-S3_BUCKET=typebot
-S3_ENDPOINT=https://storage.$DOMINIO_INPUT
+    # Criação do arquivo typebot_config.sh com base nas informações fornecidas
+cat <<EOF > typebot_config.sh
+server {
+    server_name typebot.$DOMINIO_INPUT;
+
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
 EOF
 
-    # Criação do arquivo docker-compose.yml
+# Criação do arquivo viewbot_config.sh com base nas informações fornecidas
+cat <<EOF > viewbot_config.sh
+server {
+    server_name bot.$DOMINIO_INPUT;
+
+    location / {
+        proxy_pass http://127.0.0.1:3002;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+
+# Criação do arquivo minio_config.sh com base nas informações fornecidas
+cat <<EOF > minio_config.sh
+server {
+    server_name storage.$DOMINIO_INPUT;
+
+    location / {
+        proxy_pass http://127.0.0.1:9000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+
+# Copia os arquivos de configuração para o diretório do nginx
+sudo cp typebot_config.sh /etc/nginx/sites-available/typebot
+sudo cp viewbot_config.sh /etc/nginx/sites-available/viewbot
+sudo cp minio_config.sh /etc/nginx/sites-available/minio
+
+# Cria links simbólicos para ativar os sites no nginx
+sudo ln -s /etc/nginx/sites-available/typebot /etc/nginx/sites-enabled
+sudo ln -s /etc/nginx/sites-available/viewbot /etc/nginx/sites-enabled
+sudo ln -s /etc/nginx/sites-available/minio /etc/nginx/sites-enabled
+
+# Solicita e instala certificados SSL usando Certbot
+sudo certbot --nginx --email $EMAIL_GMAIL_INPUT --redirect --agree-tos -d typebot.$DOMINIO_INPUT -d bot.$DOMINIO_INPUT -d storage.$DOMINIO_INPUT
+
+    # Criação do arquivo docker-compose.yml com base nas informações fornecidas
     cat <<EOF > docker-compose.yml
 version: '3.3'
-
 services:
   typebot-db:
     image: postgres:16
@@ -88,26 +158,43 @@ services:
         retries: 5
 
   typebot-builder:
+    ports:
+      - 3001:3000
     image: baptistearno/typebot-builder:latest
     restart: always
     depends_on:
-      typebot-db:
-        condition: service_healthy
-    ports:
-      - '8080:3000'
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
-    env_file: .env
+      - typebot-db
+    environment: 
+      - DATABASE_URL=postgresql://postgres:typebot@typebot-db:5432/typebot
+      - NEXTAUTH_URL=https://typebot.$DOMINIO_INPUT
+      - NEXT_PUBLIC_VIEWER_URL=https://bot.$DOMINIO_INPUT
+      - ENCRYPTION_SECRET=875c916244442f7d89a8f376d9d33cac
+      - ADMIN_EMAIL=${EMAIL_GMAIL_INPUT}
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=465
+      - SMTP_USERNAME=${EMAIL_GMAIL_INPUT}
+      - SMTP_PASSWORD=${SENHA_APP_GMAIL_INPUT}
+      - SMTP_SECURE=true
+      - NEXT_PUBLIC_SMTP_FROM='Suporte Typebot' <${EMAIL_GMAIL_INPUT}>
+      - S3_ACCESS_KEY=minio
+      - S3_SECRET_KEY=minio123
+      - S3_BUCKET=typebot
+      - S3_ENDPOINT=https://storage.$DOMINIO_INPUT
 
   typebot-viewer:
-    image: baptistearno/typebot-viewer:latest
-    depends_on:
-      typebot-db:
-        condition: service_healthy
-    restart: always
     ports:
-      - '8081:3000'
-    env_file: .env
+      - 3002:3000
+    image: baptistearno/typebot-viewer:latest
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://postgres:typebot@typebot-db:5432/typebot
+      - NEXT_PUBLIC_VIEWER_URL=https://bot.$DOMINIO_INPUT
+      - NEXTAUTH_URL=https://typebot.$DOMINIO_INPUT
+      - ENCRYPTION_SECRET=875c916244442f7d89a8f376d9d33cac
+      - S3_ACCESS_KEY=minio
+      - S3_SECRET_KEY=minio123
+      - S3_BUCKET=typebot
+      - S3_ENDPOINT=https://storage.$DOMINIO_INPUT
 
   mail:
     image: bytemark/smtp
@@ -122,8 +209,7 @@ services:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: minio123
     volumes:
-      - s3-data:/data
-
+      - s3_data:/data
   createbuckets:
     image: minio/mc
     depends_on:
@@ -136,77 +222,17 @@ services:
       /usr/bin/mc anonymous set public minio/typebot/public;
       exit 0;
       "
-
 volumes:
-  db-data:
-  s3-data:
-
+  db_data:
+  s3_data:
 EOF
-
-    # Configuração do Nginx
-    cat <<EOF > /etc/nginx/sites-available/typebot
-server {
-    server_name typebot.$DOMINIO_INPUT;
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_cache_bypass \$http_upgrade;
-    }
-}
-EOF
-
-    cat <<EOF > /etc/nginx/sites-available/viewbot
-server {
-    server_name bot.$DOMINIO_INPUT;
-    location / {
-        proxy_pass http://127.0.0.1:8081;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_cache_bypass \$http_upgrade;
-    }
-}
-EOF
-
-    cat <<EOF > /etc/nginx/sites-available/minio
-server {
-    server_name storage.$DOMINIO_INPUT;
-    location / {
-        proxy_pass http://127.0.0.1:9000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_cache_bypass \$http_upgrade;
-    }
-}
-EOF
-
-    # Ativa os sites no Nginx
-    sudo ln -s /etc/nginx/sites-available/typebot /etc/nginx/sites-enabled
-    sudo ln -s /etc/nginx/sites-available/viewbot /etc/nginx/sites-enabled
-    sudo ln -s /etc/nginx/sites-available/minio /etc/nginx/sites-enabled
-
-    # Configuração do SSL com Certbot
-    sudo certbot --nginx --email $EMAIL_GMAIL_INPUT --redirect --agree-tos -d typebot.$DOMINIO_INPUT -d bot.$DOMINIO_INPUT -d storage.$DOMINIO_INPUT
 
     # Inicia os contêineres
     docker compose up -d
+    cd ..
 
     echo "Typebot instalado e configurado com sucesso!"
 }
 
+# Chamada das funções
 instalar_typebot
