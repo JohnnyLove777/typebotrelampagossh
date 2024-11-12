@@ -50,7 +50,7 @@ function instalar_typebot {
     solicitar_informacoes
 
     # Criação do arquivo .env
-    cat <<EOF > .env
+cat <<EOF > .env
 ENCRYPTION_SECRET=$(openssl rand -base64 32)
 DATABASE_URL=postgresql://postgres:typebot@typebot-db:5432/typebot
 NEXTAUTH_URL=https://typebot.$DOMINIO_INPUT
@@ -61,7 +61,7 @@ SMTP_PORT=465
 SMTP_USERNAME=$EMAIL_GMAIL_INPUT
 SMTP_PASSWORD=$SENHA_APP_GMAIL_INPUT
 SMTP_SECURE=true
-NEXT_PUBLIC_SMTP_FROM='Suporte Typebot' <$EMAIL_GMAIL_INPUT>
+NEXT_PUBLIC_SMTP_FROM="Suporte Typebot <$EMAIL_GMAIL_INPUT>"
 S3_ACCESS_KEY=minio
 S3_SECRET_KEY=minio123
 S3_BUCKET=typebot
