@@ -59,7 +59,7 @@ function instalar_typebot {
             viewbot) port=3002 ;;
             minio) port=9000 ;;
         esac
-        cat <<EOF > /etc/nginx/sites-available/$app
+        cat <<EOF | sudo tee /etc/nginx/sites-available/$app > /dev/null
 server {
     server_name ${app}.$DOMINIO_INPUT;
     location / {
@@ -75,15 +75,15 @@ server {
     }
 }
 EOF
-        sudo ln -s /etc/nginx/sites-available/$app /etc/nginx/sites-enabled
+        sudo ln -sf /etc/nginx/sites-available/$app /etc/nginx/sites-enabled/
     done
 
     # Reinicia o NGINX para aplicar configurações
     sudo systemctl restart nginx
 
     # Solicita e instala certificados SSL usando Certbot
-    sudo certbot --nginx --email $EMAIL_GMAIL_INPUT --redirect --agree-tos \
-                 -d typebot.$DOMINIO_INPUT -d bot.$DOMINIO_INPUT -d storage.$DOMINIO_INPUT
+    sudo certbot --nginx --email "$EMAIL_GMAIL_INPUT" --redirect --agree-tos \
+                 -d "typebot.$DOMINIO_INPUT" -d "bot.$DOMINIO_INPUT" -d "storage.$DOMINIO_INPUT"
 
     # Criação do arquivo docker-compose.yml com base nas informações fornecidas
     cat <<EOF > docker-compose.yml
@@ -153,8 +153,8 @@ volumes:
   s3_data:
 EOF
 
-    # Inicia os contêineres
-    docker compose up -d
+    # Inicia os contêineres com docker-compose
+    docker-compose up -d
 
     echo "Typebot instalado e configurado com sucesso!"
 }
