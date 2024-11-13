@@ -38,6 +38,26 @@ function solicitar_informacoes {
     DOMINIO_INPUT=$DOMINIO
 }
 
+# Função para tentar obter o certificado SSL com retries
+function certbot_retry {
+    local retries=5
+    local count=0
+    while ((count < retries)); do
+        echo "Tentando obter certificado SSL..."
+        sudo certbot --nginx --email "$EMAIL_GMAIL_INPUT" --redirect --agree-tos \
+                     -d "typebot.$DOMINIO_INPUT" -d "bot.$DOMINIO_INPUT" -d "storage.$DOMINIO_INPUT"
+        if [ $? -eq 0 ]; then
+            echo "✅ Certificado SSL obtido com sucesso!"
+            return 0
+        fi
+        echo "⚠️ Certbot falhou. Tentando novamente... ($((count+1)) de $retries)"
+        ((count++))
+        sleep 5
+    done
+    echo "❌ Certbot falhou após $retries tentativas. Verifique se o Certbot está em uso ou se há problemas de configuração."
+    exit 1
+}
+
 # Função para instalar o Typebot de acordo com os comandos fornecidos
 function instalar_typebot {
     # Atualiza e instala dependências necessárias
@@ -54,11 +74,13 @@ function instalar_typebot {
     # Criação dos arquivos de configuração do NGINX
     for app in typebot viewbot minio; do
         port=""
+
         case $app in
             typebot) port=3001 ;;
             viewbot) port=3002 ;;
             minio) port=9000 ;;
         esac
+
         cat <<EOF | sudo tee /etc/nginx/sites-available/$app > /dev/null
 server {
     server_name ${app}.$DOMINIO_INPUT;
@@ -81,9 +103,8 @@ EOF
     # Reinicia o NGINX para aplicar configurações
     sudo systemctl restart nginx
 
-    # Solicita e instala certificados SSL usando Certbot
-    sudo certbot --nginx --email "$EMAIL_GMAIL_INPUT" --redirect --agree-tos \
-                 -d "typebot.$DOMINIO_INPUT" -d "bot.$DOMINIO_INPUT" -d "storage.$DOMINIO_INPUT"
+    # Chama a função de retry para o Certbot
+    certbot_retry
 
     # Gera uma chave secreta para criptografia
     ENCRYPTION_SECRET=$(openssl rand -hex 16)
