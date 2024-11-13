@@ -85,6 +85,9 @@ EOF
     sudo certbot --nginx --email "$EMAIL_GMAIL_INPUT" --redirect --agree-tos \
                  -d "typebot.$DOMINIO_INPUT" -d "bot.$DOMINIO_INPUT" -d "storage.$DOMINIO_INPUT"
 
+    # Gera uma chave secreta para criptografia
+    ENCRYPTION_SECRET=$(openssl rand -hex 16)
+
     # Criação do arquivo docker-compose.yml com base nas informações fornecidas
     cat <<EOF > docker-compose.yml
 version: '3.3'
@@ -109,7 +112,7 @@ services:
       - DATABASE_URL=postgresql://postgres:typebot@typebot-db:5432/typebot
       - NEXTAUTH_URL=https://typebot.$DOMINIO_INPUT
       - NEXT_PUBLIC_VIEWER_URL=https://bot.$DOMINIO_INPUT
-      - ENCRYPTION_SECRET=$(openssl rand -hex 16)
+      - ENCRYPTION_SECRET=$ENCRYPTION_SECRET
       - ADMIN_EMAIL=$EMAIL_GMAIL_INPUT
       - SMTP_HOST=smtp.gmail.com
       - SMTP_PORT=465
@@ -131,7 +134,7 @@ services:
       - DATABASE_URL=postgresql://postgres:typebot@typebot-db:5432/typebot
       - NEXT_PUBLIC_VIEWER_URL=https://bot.$DOMINIO_INPUT
       - NEXTAUTH_URL=https://typebot.$DOMINIO_INPUT
-      - ENCRYPTION_SECRET=$(openssl rand -hex 16)
+      - ENCRYPTION_SECRET=$ENCRYPTION_SECRET
       - S3_ACCESS_KEY=minio
       - S3_SECRET_KEY=minio123
       - S3_BUCKET=typebot
@@ -156,7 +159,36 @@ EOF
     # Inicia os contêineres com docker-compose
     docker-compose up -d
 
-    echo "Typebot instalado e configurado com sucesso!"
+    # Etapa 2: Verificar a existência do schema.prisma
+    SCHEMA_PATH="/app/packages/prisma/postgresql/schema.prisma"
+    CONTAINER_NAME="typebotrelampagossh_typebot-builder_1"
+
+    echo "🔍 Verificando a existência do schema.prisma no contêiner '$CONTAINER_NAME'..."
+    docker exec -it "$CONTAINER_NAME" sh -c "test -f $SCHEMA_PATH"
+    if [ $? -ne 0 ]; then
+      echo "❌ O arquivo schema.prisma não foi encontrado no caminho esperado: $SCHEMA_PATH"
+      exit 1
+    fi
+    echo "✅ schema.prisma encontrado!"
+
+    # Etapa 3: Executar migrações do Prisma
+    echo "📦 Executando migrações do Prisma no contêiner '$CONTAINER_NAME'..."
+    docker exec -it "$CONTAINER_NAME" npx prisma migrate deploy --schema "$SCHEMA_PATH"
+    if [ $? -ne 0 ]; then
+      echo "❌ Falha ao aplicar migrações. Verifique a configuração e o caminho do schema."
+      exit 1
+    fi
+    echo "✅ Migrações aplicadas com sucesso!"
+
+    # Etapa 4: Confirmar status dos contêineres
+    echo "🔄 Verificando o status dos contêineres..."
+    docker-compose ps
+
+    # Etapa 5: Checar logs para garantir que não há erros
+    echo "📄 Checando logs do builder para garantir que tudo esteja funcionando corretamente..."
+    docker logs "$CONTAINER_NAME" | tail -n 20
+
+    echo "🎉 Typebot configurado com sucesso e migrações aplicadas! Sistema pronto para uso."
 }
 
 # Chamada das funções
