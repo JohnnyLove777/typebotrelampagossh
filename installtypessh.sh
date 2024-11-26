@@ -1,21 +1,33 @@
 #!/bin/bash
 
-# Função para instalar dependências e configurar o servidor
-function instalar_dependencias {
-    echo "🔄 Atualizando pacotes e instalando dependências..."
+# Função para instalar Docker e dependências
+function instalar_docker_e_compose {
+    echo "🔄 Atualizando pacotes e configurando repositórios..."
+
+    # Atualizar pacotes e adicionar repositórios necessários
     sudo apt update && sudo apt upgrade -y
-    sudo apt install -y software-properties-common apt-transport-https ca-certificates curl wget git nano nginx docker.io python3-certbot-nginx
+    sudo apt install -y ca-certificates curl gnupg
 
-    echo "🔄 Configurando Docker..."
-    sudo usermod -aG docker $USER
-    sudo systemctl enable docker
+    # Adicionar chave GPG do Docker
+    sudo install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+    # Adicionar repositório do Docker
+    echo \
+        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+        $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    # Atualizar pacotes novamente e instalar o Docker
+    sudo apt update
+    sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+    # Iniciar Docker e adicionar o usuário ao grupo Docker
     sudo systemctl start docker
+    sudo systemctl enable docker
+    sudo usermod -aG docker $USER
 
-    # Instalar Docker Compose Plugin
-    echo "🔄 Instalando Docker Compose Plugin..."
-    sudo apt install -y docker-compose-plugin
-
-    echo "✅ Dependências instaladas com sucesso!"
+    echo "✅ Docker e Docker Compose Plugin instalados com sucesso!"
 }
 
 # Função para solicitar informações ao usuário
