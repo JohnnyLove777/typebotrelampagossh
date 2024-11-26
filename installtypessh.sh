@@ -140,7 +140,7 @@ EOF
 
 # Função principal
 function instalar_typebot {
-    instalar_dependencias
+    instalar_docker_e_compose
     solicitar_informacoes
     configurar_nginx
     configurar_certbot
