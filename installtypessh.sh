@@ -1,5 +1,20 @@
 #!/bin/bash
 
+# Função para solicitar informações ao usuário
+function solicitar_informacoes {
+    while true; do
+        read -p "Digite o domínio principal (exemplo: seu-dominio.com): " DOMINIO
+        if [[ $DOMINIO =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+            break
+        else
+            echo "Por favor, insira um domínio válido, como 'seu-dominio.com'."
+        fi
+    done
+
+    read -p "Digite o e-mail do administrador (para login no painel): " ADMIN_EMAIL
+    read -p "Digite a senha do app do Gmail para SMTP: " SENHA_APP_GMAIL
+}
+
 # Função para instalar pacotes básicos e dependências
 function instalar_dependencias {
     echo "🔄 Atualizando pacotes e instalando dependências básicas..."
@@ -103,50 +118,42 @@ function configurar_ssl {
 # Função para configurar o Typebot
 function configurar_typebot {
     echo "⚙️ Configurando Typebot..."
-    local dominio=$1
-    local email=$2
-    local senha=$3
-
-    # Baixar docker-compose.yml e .env
     wget https://raw.githubusercontent.com/baptisteArno/typebot.io/latest/docker-compose.yml
     wget https://raw.githubusercontent.com/baptisteArno/typebot.io/latest/.env.example -O .env
 
-    # Gerar chave de criptografia
-    local encryption_secret=$(openssl rand -base64 24 | tr -d '\n')
+    ENCRYPTION_SECRET=$(openssl rand -base64 24 | tr -d '\n')
+    cat <<EOF > .env
+ENCRYPTION_SECRET=$ENCRYPTION_SECRET
+DATABASE_URL=postgresql://postgres:typebot@typebot-db:5432/typebot
+NODE_OPTIONS=--no-node-snapshot
+NEXTAUTH_URL=https://typebot.$DOMINIO
+NEXT_PUBLIC_VIEWER_URL=https://bot.$DOMINIO
+ADMIN_EMAIL=$ADMIN_EMAIL
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_USERNAME=$ADMIN_EMAIL
+SMTP_PASSWORD=$SENHA_APP_GMAIL
+SMTP_SECURE=true
+S3_ACCESS_KEY=minio
+S3_SECRET_KEY=minio123
+S3_BUCKET=typebot
+S3_ENDPOINT=https://storage.$DOMINIO
+NEXT_PUBLIC_SMTP_FROM="Suporte Typebot <$ADMIN_EMAIL>"
+EOF
 
-    # Editar arquivo .env
-    sed -i "s|ENCRYPTION_SECRET=.*|ENCRYPTION_SECRET=${encryption_secret}|" .env
-    sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql://postgres:typebot@typebot-db:5432/typebot|" .env
-    sed -i "s|NEXTAUTH_URL=.*|NEXTAUTH_URL=https://typebot.${dominio}|" .env
-    sed -i "s|NEXT_PUBLIC_VIEWER_URL=.*|NEXT_PUBLIC_VIEWER_URL=https://bot.${dominio}|" .env
-    sed -i "s|ADMIN_EMAIL=.*|ADMIN_EMAIL=${email}|" .env
-    sed -i "s|SMTP_USERNAME=.*|SMTP_USERNAME=${email}|" .env
-    sed -i "s|SMTP_PASSWORD=.*|SMTP_PASSWORD=${senha}|" .env
-
-    # Iniciar serviços com Docker Compose
+    echo "📦 Iniciando contêineres do Typebot..."
     docker compose up -d
-    echo "✅ Typebot configurado e rodando!"
+    echo "✅ Typebot configurado e iniciado!"
 }
 
-# Função principal
-function instalar_typebot {
-    # Solicitar informações ao usuário
-    echo "🔍 Por favor, forneça as informações solicitadas."
-    read -p "Digite o domínio (exemplo: seu-dominio.com): " dominio
-    read -p "Digite o e-mail para SSL e configuração do Typebot: " email
-    read -p "Digite a senha de app do Gmail (16 caracteres): " senha
+# Fluxo principal
+solicitar_informacoes
+instalar_dependencias
+instalar_docker
+instalar_nginx
+instalar_certbot
+configurar_nginx "$DOMINIO"
+configurar_ssl "$ADMIN_EMAIL" "$DOMINIO"
+configurar_typebot
 
-    # Executar funções
-    instalar_dependencias
-    instalar_docker
-    instalar_nginx
-    instalar_certbot
-    configurar_nginx "$dominio"
-    configurar_ssl "$email" "$dominio"
-    configurar_typebot "$dominio" "$email" "$senha"
-
-    echo "🎉 Instalação concluída! Typebot configurado em https://typebot.$dominio"
-}
-
-# Executar função principal
-instalar_typebot
+echo "🎉 Instalação concluída! Acesse https://typebot.$DOMINIO para usar o Typebot."
