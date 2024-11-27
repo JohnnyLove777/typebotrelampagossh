@@ -25,13 +25,14 @@ print_step "Por favor, insira as informações necessárias para a configuraçã
 
 read -p "🌐 Qual é o domínio principal (exemplo: johnnytype.fun)? " DOMAIN
 read -p "📧 Qual é o seu e-mail do Gmail para configuração de SMTP? " GMAIL
-read -sp "🔑 Qual é a senha de app do Gmail? (Você pode gerar em https://myaccount.google.com/security) " GMAIL_APP_PASSWORD
+read -p "🔑 Qual é a senha de app do Gmail? (Você pode gerar em https://myaccount.google.com/security) " GMAIL_APP_PASSWORD
 echo
 
 # Confirmar dados
 print_info "\n📋 Resumo das informações fornecidas:"
 echo "  - Domínio principal: $DOMAIN"
 echo "  - E-mail do Gmail: $GMAIL"
+echo "  - Senha de app do Gmail: $GMAIL_APP_PASSWORD"
 read -p "Está tudo correto? (s/n): " CONFIRM
 
 if [[ "$CONFIRM" != "s" ]]; then
