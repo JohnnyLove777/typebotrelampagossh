@@ -62,8 +62,48 @@ print_success "Docker Compose instalado com sucesso!"
 
 # Configurar Typebot
 print_step "4. Baixando e configurando o Typebot... 🤖"
-wget https://raw.githubusercontent.com/baptisteArno/typebot.io/latest/docker-compose.yml
-wget https://raw.githubusercontent.com/baptisteArno/typebot.io/latest/.env.example -O .env
+cat <<EOF > docker-compose.yml
+version: '3.3'
+
+volumes:
+  db-data:
+
+services:
+  typebot-db:
+    image: postgres:16
+    restart: always
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=typebot
+      - POSTGRES_PASSWORD=typebot
+    healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U postgres"]
+        interval: 5s
+        timeout: 5s
+        retries: 5
+  typebot-builder:
+    image: baptistearno/typebot-builder:latest
+    restart: always
+    depends_on:
+      typebot-db:
+        condition: service_healthy
+    ports:
+      - '8090:3000'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    env_file: .env
+
+  typebot-viewer:
+    image: baptistearno/typebot-viewer:latest
+    depends_on:
+      typebot-db:
+        condition: service_healthy
+    restart: always
+    ports:
+      - '8091:3000'
+    env_file: .env
+EOF
 
 # Gerar chave de criptografia
 print_step "🔒 Gerando chave de criptografia..."
